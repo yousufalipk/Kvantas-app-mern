@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <meta name="theme-color" content="#000000" />
+    <meta
+      name="description"
+      content="Web site created using create-react-app"
+    />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- <script
+      async
+      src="https://telegram.org/js/telegram-widget.js"
+      data-telegram-share-url="https://core.telegram.org/widgets/share"
+    ></script> -->
+    <title>Kvants</title>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+  </body>
+</html>
+<script>
+  const overflow = 100;
+  document.body.style.overflowY = "hidden";
+
+  document.body.style.paddingTop = `${overflow}px`;
+  document.body.style.height = window.innerHeight + overflow + "px";
+  document.body.style.paddingBottom = `${overflow}px`;
+
+  window.scrollTo(0, overflow);
+</script>
