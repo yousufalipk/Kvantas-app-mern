@@ -5,20 +5,129 @@ const AnnoucementModel = require('../models/annoucementSchema');
 const { TELEGRAM_BOT_TOKEN, CHAT_ID } = require('../Config/env');
 const { check48Hour, check24hour, check1hour } = require('../utils/timeCheckUtils');
 const { updateReferrals } = require('../utils/updateReferalUtils');
+const user = require('../models/userSchema');
 
-const upgradeCosts = [100, 200, 300];
+const upgradeCosts = [
+    500, 1000, 2000, 4000, 8000, 16000, 32000, 64000, 128000, 256000, 512000,
+    1024000, 2048000,
+];
 const tapValues = [
-    { level: 1, value: 1 },
-    { level: 2, value: 2 },
-    { level: 3, value: 3 },
+    {
+        level: 1,
+        value: 2,
+    },
+    {
+        level: 2,
+        value: 3,
+    },
+    {
+        level: 3,
+        value: 4,
+    },
+    {
+        level: 4,
+        value: 5,
+    },
+    {
+        level: 5,
+        value: 6,
+    },
+    {
+        level: 6,
+        value: 7,
+    },
+    {
+        level: 7,
+        value: 8,
+    },
+    {
+        level: 8,
+        value: 9,
+    },
+    {
+        level: 9,
+        value: 10,
+    },
+    {
+        level: 10,
+        value: 11,
+    },
+    {
+        level: 11,
+        value: 12,
+    },
+    {
+        level: 12,
+        value: 13,
+    },
+    {
+        level: 13,
+        value: 14,
+    },
+];
+const energyUpgradeCosts = [
+    500, 1000, 2000, 4000, 8000, 16000, 32000, 64000, 128000, 256000, 512000,
+    1024000, 2048000, 4096000,
+];
+const energyValues = [
+    {
+        level: 1,
+        energy: 500,
+    },
+    {
+        level: 2,
+        energy: 1000,
+    },
+    {
+        level: 3,
+        energy: 1500,
+    },
+    {
+        level: 4,
+        energy: 2000,
+    },
+    {
+        level: 5,
+        energy: 2500,
+    },
+    {
+        level: 6,
+        energy: 3000,
+    },
+    {
+        level: 7,
+        energy: 3500,
+    },
+    {
+        level: 8,
+        energy: 4000,
+    },
+    {
+        level: 9,
+        energy: 4500,
+    },
+    {
+        level: 10,
+        energy: 5000,
+    },
+    {
+        level: 11,
+        energy: 5500,
+    },
+    {
+        level: 12,
+        energy: 6000,
+    },
+    {
+        level: 13,
+        energy: 6500,
+    },
+    {
+        level: 14,
+        energy: 7000,
+    },
 ];
 
-const energyUpgradeCosts = [100, 200, 300];
-const energyValues = [
-    { level: 1, energy: 500 },
-    { level: 2, energy: 1000 },
-    { level: 3, energy: 1500 },
-];
 
 exports.getAllSocialTasks = async (req, res) => {
     try {
@@ -148,124 +257,131 @@ exports.sendUserData = async (req, res) => {
     try {
         const { queryParams, referrerId, isPremium, telegramUser } = req.body;
 
-        if (telegramUser) {
-            const {
-                id: userId,
-                username,
-                first_name: firstName,
-                last_name: lastName,
-            } = telegramUser;
-            const finalUsername = username || `${firstName}_${lastName}`;
-
-            // Check if the user already exists
-            const existingUser = await UserModel.findOne({ userId: userId.toString() });
-
-            if (existingUser) {
-                console.log("User already exists in MongoDB");
-                // Update referrals
-                await updateReferrals(existingUser);
-                // Send response with user data
-                return res.status(200).json({
-                    status: 'existingUser',
-                    message: "User already exists",
-                    userData: existingUser,
-                });
-            }
-
-            // Prepare user data for new user
-            const userData = {
-                userId: userId.toString(),
-                username: finalUsername,
-                firstName,
-                lastName,
-                totalBalance: 0,
-                balance: isPremium ? 25000 : 10000,
-                freeGuru: 3,
-                fullTank: 3,
-                tapBalance: 0,
-                timeSta: null,
-                timeStaTank: null,
-                daily_claimed: {
-                    claimed: [],
-                    day: 0,
-                    date: "",
-                    reward: 0,
-                },
-                claimedReferralRewards: [],
-                tapValue: { level: 0, value: 1 },
-                timeRefill: { level: 1, duration: 10, step: 600 },
-                level: { id: 1, name: "Bronze", imgUrl: "/bronze.webp" },
-                energy: 500,
-                battery: { level: 1, energy: 500 },
-                refereeId: referrerId || null,
-                referrals: [],
-                double_booster: {
-                    startAt: "",
-                    rewardTimer: "",
-                    rewardClaimed: 0,
-                    rewardStart: false,
-                },
-                power_tap: {
-                    startAt: "",
-                    rewardTimer: "",
-                    rewardClaimed: 0,
-                    rewardStart: false,
-                },
-                announcementReward: {
-                    link: "",
-                    status: "notVerified",
-                    timestamp: null,
-                },
-                task_lists: [],
-                daily_task_lists: [],
-                youtube_booster: {
-                    date: "",
-                    startAt: "",
-                    status: false,
-                    rewardIndex: 0,
-                    videoWatch: 0,
-                },
-                twitterUserName: "",
-                tonWalletAddress: "",
-                createdAt: new Date(),
-            };
-
-            // Save new user in MongoDB
-            const newUser = new UserModel(userData);
-            await newUser.save();
-
-            // Update referrer information if available
-            if (referrerId) {
-                const referrer = await UserModel.findOne({ userId: referrerId });
-                if (referrer) {
-                    referrer.referrals.push({
-                        userId: userId.toString(),
-                        username: finalUsername,
-                        balance: newUser.balance,
-                        status: false,
-                        isPremium,
-                        level: { id: 1, name: "Bronze", imgUrl: "/bronze.webp" },
-                    });
-                    await referrer.save();
-                }
-            }
-            // Send response with new user data
-            res.status(200).json({
-                status: 'newUser',
-                message: "New user created",
-                userData: newUser,
-            });
-        } else {
-            res.status(200).json({
+        if (!telegramUser) {
+            return res.status(400).json({
                 status: 'failed',
                 message: "Telegram user data is required"
             });
         }
+
+        const {
+            id: userId,
+            username,
+            first_name: firstName,
+            last_name: lastName,
+        } = telegramUser;
+
+        const finalUsername = username || `${firstName}_${lastName}`;
+
+        // Check if the user already exists
+        const existingUser = await UserModel.findOne({ userId: userId.toString() });
+
+        if (existingUser) {
+            console.log("User already exists in MongoDB");
+            // Update referrals (Assuming updateReferrals is a valid function)
+            await updateReferrals(existingUser);
+
+            // Send response with user data
+            return res.status(200).json({
+                status: 'existingUser',
+                message: "User already exists",
+                userData: existingUser,
+            });
+        }
+
+        // Prepare user data for new user
+        const baseUserData = {
+            userId: userId.toString(),
+            username: finalUsername,
+            firstName,
+            lastName,
+            totalBalance: 0,
+            freeGuru: 3,
+            fullTank: 3,
+            tapBalance: 0,
+            timeSta: null,
+            timeStaTank: null,
+            daily_claimed: {
+                claimed: [],
+                day: 0,
+                date: "",
+                reward: 0,
+            },
+            claimedReferralRewards: [],
+            tapValue: { level: 0, value: 1 },
+            timeRefill: { level: 1, duration: 10, step: 600 },
+            level: { id: 1, name: "Bronze", imgUrl: "/bronze.webp" },
+            energy: 500,
+            battery: { level: 1, energy: 500 },
+            refereeId: referrerId || null,
+            referrals: [],
+            double_booster: {
+                startAt: "",
+                rewardTimer: "",
+                rewardClaimed: 0,
+                rewardStart: false,
+            },
+            power_tap: {
+                startAt: "",
+                rewardTimer: "",
+                rewardClaimed: 0,
+                rewardStart: false,
+            },
+            announcementReward: {
+                link: "",
+                status: "notVerified",
+                timestamp: null,
+            },
+            task_lists: [],
+            daily_task_lists: [],
+            youtube_booster: {
+                date: "",
+                startAt: "",
+                status: false,
+                rewardIndex: 0,
+                videoWatch: 0,
+            },
+            twitterUserName: "",
+            tonWalletAddress: "",
+            createdAt: new Date(), // or serverTimestamp() if using Firebase
+        };
+
+        const userData = referrerId
+            ? { ...baseUserData, balance: isPremium ? 25000 : 10000 }
+            : { ...baseUserData, balance: 0 };
+
+        // Save new user in MongoDB
+        const newUser = new UserModel(userData);
+        await newUser.save();
+
+        // Update referrer information if available
+        if (referrerId) {
+            const referrer = await UserModel.findOne({ userId: referrerId });
+            if (referrer) {
+                referrer.referrals.push({
+                    userId: userId.toString(),
+                    username: finalUsername,
+                    balance: newUser.balance,
+                    status: false,
+                    isPremium,
+                    level: { id: 1, name: "Bronze", imgUrl: "/bronze.webp" },
+                });
+                await referrer.save();
+            }
+        }
+
+        // Send response with new user data
+        res.status(200).json({
+            status: 'newUser',
+            message: "New user created",
+            userData: newUser,
+        });
     } catch (error) {
-        console.error("Error saving user in MongoDB:", error);
+        console.error("Error saving user in MongoDB:", error.message || error);
         res.status(500).json({
             status: 'failed',
-            message: "Internal server error"
+            message: "Internal server error",
+            error: error.message || error,
         });
     }
 };
@@ -358,9 +474,9 @@ exports.fetchUsersDay = async (req, res) => {
 exports.fetchUsersWeek = async (req, res) => {
     try {
         const { queryValue } = req.body;
-    
+
         let query;
-    
+
         if (queryValue) {
             // Query for matching usernames and sort by balance in descending order
             query = UserModel.find({
@@ -370,9 +486,9 @@ exports.fetchUsersWeek = async (req, res) => {
             // If no queryValue, get all users and sort by balance in descending order
             query = UserModel.find().sort({ balance: -1 });
         }
-    
+
         const users = await query.exec();
-    
+
         // Respond with the retrieved users
         return res.status(200).json({
             status: 'success',
@@ -384,7 +500,7 @@ exports.fetchUsersWeek = async (req, res) => {
             status: 'failed',
             message: 'Internal Server Error!'
         });
-    }    
+    }
 };
 
 exports.calculateOverallBalance = async (req, res) => {
@@ -557,7 +673,7 @@ exports.updateWalletAddress = async (req, res) => {
 
 exports.updateReferralsReq = async (req, res) => {
     const { userId } = req.body;
-    
+
     const result = await updateReferrals(userId);
 
     // Send the result as a response
@@ -831,9 +947,9 @@ exports.fetchStartTimePowerTap = async (req, res) => {
         const user = await UserModel.findById(id);
 
         if (!user) {
-            return res.status(200).json({ 
-                status: 'failed', 
-                message: 'User not found' 
+            return res.status(200).json({
+                status: 'failed',
+                message: 'User not found'
             });
         }
 
@@ -1091,10 +1207,13 @@ exports.upgrade = async (req, res) => {
 
         if (nextLevel < tapValues.length && balance + refBonus >= upgradeCost) {
             const newTapValue = tapValues[nextLevel];
-            const user = await User.findOne({ userId });
+            const user = await UserModel.findById(userId);
 
             if (!user) {
-                return res.status(404).json({ message: 'User not found.' });
+                return res.status(200).json({
+                    status: 'failed',
+                    message: 'User not found.'
+                });
             }
 
             user.tapValue = newTapValue;
@@ -1103,12 +1222,16 @@ exports.upgrade = async (req, res) => {
             await user.save();
 
             res.status(200).json({
+                status: 'success',
                 message: `Upgrade is yours! Multitap Level ${newTapValue.level}`,
                 newTapValue,
                 newBalance: user.balance,
             });
         } else {
-            res.status(400).json({ message: 'Not enough balance or invalid level.' });
+            res.status(200).json({
+                status: 'failed',
+                message: 'Not enough balance or invalid level.'
+            });
         }
     } catch (error) {
         console.error('Error updating tap value:', error);
@@ -1125,10 +1248,13 @@ exports.energyUpgrade = async (req, res) => {
 
         if (nextEnergyLevel < energyValues.length && balance + refBonus >= energyUpgradeCost) {
             const newEnergyValue = energyValues[nextEnergyLevel];
-            const user = await User.findOne({ userId });
+            const user = await UserModel.findById(userId);
 
             if (!user) {
-                return res.status(404).json({ message: 'User not found.' });
+                return res.status(200).json({
+                    status: 'failed',
+                    message: 'User not found.'
+                });
             }
 
             user.battery = {
@@ -1141,12 +1267,16 @@ exports.energyUpgrade = async (req, res) => {
             await user.save();
 
             res.status(200).json({
+                status: 'success',
                 message: `Upgrade is yours! Energy limit Level ${newEnergyValue.level}`,
                 newEnergyValue,
                 newBalance: user.balance,
             });
         } else {
-            res.status(400).json({ message: 'Not enough balance or invalid level.' });
+            res.status(200).json({
+                status: 'failed',
+                message: 'Not enough balance or invalid level.'
+            });
         }
     } catch (error) {
         console.error('Error updating energy value:', error);
@@ -1158,7 +1288,7 @@ exports.fetchStartTime = async (req, res) => {
     const { userId } = req.body;
 
     try {
-        const user = await User.findOne({ userId });
+        const user = await UserModel.findById(userId);
 
         if (!user) {
             return res.status(404).json({ message: 'User not found.' });
@@ -1202,7 +1332,7 @@ exports.fetchStartTimePowerTaps = async (req, res) => {
     const { userId } = req.body;
 
     try {
-        const user = await User.findOne({ userId });
+        const user = await UserModel.findById(userId);
 
         if (!user) {
             return res.status(404).json({ message: 'User not found.' });
@@ -1246,16 +1376,22 @@ exports.HandlePowerTap = async (req, res) => {
     const { userId } = req.body;
 
     try {
-        const user = await User.findOne({ userId });
+        const user = await UserModel.findById(userId);
 
         if (!user) {
-            return res.status(404).json({ message: 'User not found.' });
+            return res.status(200).json({
+                status: 'failed',
+                message: 'User not found.'
+            });
         }
 
         const { power_tap } = user;
 
         if (power_tap.rewardClaimed >= 3) {
-            return res.status(400).json({ message: 'Come after 24 hours' });
+            return res.status(200).json({
+                status: 'failed',
+                message: 'Come after 24 hours'
+            });
         }
 
         const rewardTimerExpired = power_tap.rewardTimer && check1hour(power_tap.rewardTimer);
@@ -1273,11 +1409,15 @@ exports.HandlePowerTap = async (req, res) => {
             await user.save();
 
             res.status(200).json({
+                status: 'success',
                 message: 'You can tap unlimited times for 1 minute',
                 newPowerIndex: rewardClaimed,
             });
         } else {
-            res.status(400).json({ message: 'PowerTap already enabled' });
+            res.status(200).json({
+                status: 'failed',
+                message: 'PowerTap already enabled'
+            });
         }
     } catch (error) {
         console.error('Error handling power tap:', error);
@@ -1289,16 +1429,22 @@ exports.HandleSetIndex = async (req, res) => {
     const { userId } = req.body;
 
     try {
-        const user = await User.findOne({ userId });
+        const user = await UserModel.findById(userId);
 
         if (!user) {
-            return res.status(404).json({ message: 'User not found.' });
+            return res.status(200).json({
+                status: 'failed',
+                message: 'User not found.'
+            });
         }
 
         const { double_booster } = user;
 
         if (double_booster.rewardClaimed >= 3) {
-            return res.status(400).json({ message: 'Come after 24 hours' });
+            return res.status(200).json({
+                status: 'failed',
+                message: 'Come after 24 hours'
+            });
         }
 
         const rewardTimerExpired = double_booster.rewardTimer && check1hour(double_booster.rewardTimer);
@@ -1316,11 +1462,15 @@ exports.HandleSetIndex = async (req, res) => {
             await user.save();
 
             res.status(200).json({
+                status: 'success',
                 message: 'You can tap unlimited times for 1 minute',
                 newRewardClaimed: rewardClaimed,
             });
         } else {
-            res.status(400).json({ message: 'Booster already enabled' });
+            res.status(200).json({
+                status: 'failed',
+                message: 'Booster already enabled'
+            });
         }
     } catch (error) {
         console.error('Error handling double booster:', error);

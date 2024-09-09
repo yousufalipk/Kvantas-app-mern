@@ -133,7 +133,7 @@ router.post('/energy-upgrade', energyUpgrade);
 router.post('/fetch-start-time', fetchStartTime);
 
 // Fetch Start Time
-router.post('/fetch-start-time-power-tap', fetchStartTimePowerTaps);
+router.post('/fetch-start-time-power-taps', fetchStartTimePowerTaps);
 
 // Handle Power Tap
 router.post('/handle-power-tap', HandlePowerTap);

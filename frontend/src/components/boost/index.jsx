@@ -422,7 +422,7 @@ const Boost = () => {
 	// 4 - function to update 
 	const fetchStartTimePowerTap = async () => {
 		try {
-			const response = await fetch(`${apiUrl}/fetch-start-time-power-tap`, {
+			const response = await fetch(`${apiUrl}/fetch-start-time-power-taps`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
@@ -432,12 +432,15 @@ const Boost = () => {
 
 			const data = await response.json();
 
-			if (response.ok) {
+			if (response.status === 'success') {
 				if (data.message === 'Power tap expired and reset successfully.') {
 					setPowerIndex(data.newPowerIndex);
 				}
 				// Handle other cases as needed
 			} else {
+				if(response.data){
+					notifyError(response.data.message)
+				}
 				console.error('Error:', data.message);
 			}
 		} catch (error) {
@@ -538,7 +541,12 @@ const Boost = () => {
 						setDoubleBooster(false);
 					}, 1000);
 				} else {
-					notifyError(data.message);
+					if(response.data){
+						notifyError(response.data.message);
+					}
+					else{
+						console.log("Error setting index!");
+					}
 				}
 			} else {
 				console.error('Error:', data.message);

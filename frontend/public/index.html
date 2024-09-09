@@ -17,11 +17,6 @@
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- <script
-      async
-      src="https://telegram.org/js/telegram-widget.js"
-      data-telegram-share-url="https://core.telegram.org/widgets/share"
-    ></script> -->
     <title>Kvants</title>
   </head>
   <body>
@@ -33,9 +28,9 @@
   const overflow = 100;
   document.body.style.overflowY = "hidden";
 
-  document.body.style.paddingTop = `${overflow}px`;
-  document.body.style.height = window.innerHeight + overflow + "px";
-  document.body.style.paddingBottom = `${overflow}px`;
+  // document.body.style.paddingTop = `${overflow}px`;
+  // document.body.style.height = window.innerHeight + overflow + "px";
+  // document.body.style.paddingBottom = `${overflow}px`;
 
   window.scrollTo(0, overflow);
 </script>
