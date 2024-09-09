@@ -9,11 +9,7 @@ const app = express();
 app.use(express.json());
 
 
-// CORS configuration
-app.use(cors({
-    origin: FRONTEND_ORIGIN,
-    credentials: true
-}));
+app.use(cors());
 
 ConnectToDB();
 
