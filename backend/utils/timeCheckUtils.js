@@ -1,7 +1,7 @@
 // Utility function to check if 48 hours (or 10 minutes in your test case) have passed since the given date
 const check48Hour = (date) => {
     const now = new Date();
-    const lastClaimedDate = new Date(date); 
+    const lastClaimedDate = new Date(date);
 
     if (!lastClaimedDate) {
         return true;
@@ -17,7 +17,7 @@ const check48Hour = (date) => {
 // Utility function to check if 24 hours (or 1 minute in your test case) have passed since the given date
 const check24Hour = (date) => {
     const now = new Date();
-    const lastClaimedDate = new Date(date); 
+    const lastClaimedDate = new Date(date);
 
     if (!lastClaimedDate) {
         return true;
@@ -30,4 +30,15 @@ const check24Hour = (date) => {
     return now - lastClaimedDate >= oneDay;
 };
 
-module.exports = { check48Hour, check24Hour };
+
+// Helper function for checking timer
+const check1hour = (timer) => {
+    const timerDate = new Date(timer);
+    const currentTime = Date.now();
+    const oneHourInMillis = 60 * 60 * 1000;
+    return currentTime - timerDate.getTime() >= oneHourInMillis;
+}
+
+
+
+module.exports = { check48Hour, check24Hour, check1hour};

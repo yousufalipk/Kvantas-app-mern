@@ -14,7 +14,7 @@ const {
     updateAnnouncementLink,
     fetchAnnouncementReward,
     updateWalletAddress,
-    updateReferrals,
+    updateReferralsReq,
     fetchTasks,
     fetchUserData,
     fetchReferrals,
@@ -23,7 +23,19 @@ const {
     checkAndUpdateFreeGuru,
     checkAndUpdateFullTank,
     fetchStartTimeTap,
-    fetchStartTimePowerTap
+    fetchStartTimePowerTap,
+    updateData,
+    handleClaim,
+    verifyTelegram,
+    claimDailyTask,
+    handleAnnoucement,
+    upgrade,
+    energyUpgrade,
+    fetchStartTime,
+    fetchStartTimePowerTaps,
+    HandlePowerTap,
+    HandleSetIndex,
+    claimTask
 } = require('../controller/userController');
 
 
@@ -64,7 +76,7 @@ router.get('/fetch-announcement-reward/:id', fetchAnnouncementReward);
 router.put('/update-wallet-address', updateWalletAddress);
 
 // Update referrals
-router.put('/update-referrals/:userId', updateReferrals);
+router.put('/update-referrals/:userId', updateReferralsReq);  
 
 // Fetch tasks
 router.get('/fetch-tasks', fetchTasks);
@@ -79,19 +91,55 @@ router.get('/fetch-referrals/:userId', fetchReferrals);
 router.get('/fetch-announcement/:id', fetchAnnouncement);
 
 // Update user level
-router.put('/update-user-level/:userId', updateUserLevel);
+router.put('/update-user-level', updateUserLevel);
 
 // Check and update free guru
-router.put('/check-update-free-guru/:userId', checkAndUpdateFreeGuru);
+router.put('/check-update-free-guru', checkAndUpdateFreeGuru);
 
 // Check and update full tank
-router.put('/check-update-full-tank/:id', checkAndUpdateFullTank);
+router.put('/check-update-full-tank', checkAndUpdateFullTank);
 
 // Fetch start time tap
 router.get('/fetch-start-time-tap/:id', fetchStartTimeTap);
 
 // Fetch start time power tap
 router.get('/fetch-start-time-power-tap/:id', fetchStartTimePowerTap);
+
+// Update Data 
+router.put('/update-data', updateData);
+
+// Update Data for rewards claim
+router.post('/claim', handleClaim);
+
+// Verify Telegram
+router.post('/verify-telegram', verifyTelegram);
+
+// Claim Task
+router.post('/claim-task', claimTask);
+
+// Claim Daily Task
+router.post('/claim-daily-task', claimDailyTask);
+
+// Claim Daily Task
+router.post('/handle-announcement', handleAnnoucement);
+
+// upgrade
+router.post('/upgrade', upgrade);
+
+// upgrade energy
+router.post('/energy-upgrade', energyUpgrade);
+
+// Fetch Start Time
+router.post('/fetch-start-time', fetchStartTime);
+
+// Fetch Start Time
+router.post('/fetch-start-time-power-tap', fetchStartTimePowerTaps);
+
+// Handle Power Tap
+router.post('/handle-power-tap', HandlePowerTap);
+
+// Handle Power Tap
+router.post('/handle-set-index', HandleSetIndex);
 
 
 

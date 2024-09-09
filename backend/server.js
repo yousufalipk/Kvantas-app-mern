@@ -1,15 +1,21 @@
 const express = require('express')
-const { PORT } = require('./Config/env');
+const { PORT, FRONTEND_ORIGIN } = require('./Config/env');
 const ConnectToDB = require('./Config/db');
+const cors = require('cors');
 
 const userRoutes = require('./Routes/userRoutes');
 
 const app = express();
 app.use(express.json());
 
+
+// CORS configuration
+app.use(cors({
+    origin: FRONTEND_ORIGIN,
+    credentials: true
+}));
+
 ConnectToDB();
-
-
 
 // test route
 app.get('/', (req, res)=> {

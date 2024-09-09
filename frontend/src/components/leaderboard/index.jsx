@@ -39,44 +39,15 @@ const Leaderboard = () => {
 		user.username.toLowerCase().includes(searchQuery.toLowerCase())
 	);
 
-	const isCreatedWithinLastWeek = (createdAt) => {
-		const now = new Date();
-		const oneWeekAgo = new Date();
-		oneWeekAgo.setDate(now.getDate() - 7);
-
-		// Convert Firestore Timestamp to Date
-		const createdDate = new Date(
-			createdAt.seconds * 1000 + createdAt.nanoseconds / 1000000
-		);
-
-		return createdDate >= oneWeekAgo && createdDate <= now;
-	};
-
-	const filteredTopUserWeek = topUserWeek?.filter(
-		(user) =>
-			user.username.toLowerCase().includes(searchWeekQuery.toLowerCase()) &&
-			isCreatedWithinLastWeek(user.createdAt)
+	// Removed the date filter, relying on API to provide correct data for the week
+	const filteredTopUserWeek = topUserWeek?.filter((user) =>
+		user.username.toLowerCase().includes(searchWeekQuery.toLowerCase())
 	);
 
 	return (
 		<>
 			<div className="w-full min-h-screen text-white flex flex-col items-center font-sans bg-[url('/src/assets/MainBackground.png')] overflow-x-hidden pt-5  px-3  bg-cover  ">
 				<div className='w-full flex flex-col justify-center items-center bg-transparent relative'>
-					{/* <Link
-						to={"/"}
-						className='absolute top-[8.5px] left-2'>
-						<svg
-							width='19'
-							height='16'
-							viewBox='0 0 19 16'
-							fill='none'
-							xmlns='http://www.w3.org/2000/svg'>
-							<path
-								d='M18.9999 6.99997H4.41394L9.70694 1.70697L8.29294 0.292969L0.585938 7.99997L8.29294 15.707L9.70694 14.293L4.41394 8.99997H18.9999V6.99997Z'
-								fill='white'
-							/>
-						</svg>
-					</Link> */}
 					<h1 className='text-2xl font-bold '>Leaderboard</h1>
 					<div className='flex items-center gap-2  my-[11px]'>
 						<img

@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { Outlet } from "react-router-dom";
-import "../../App.css";
+import "../../index.css";  // Ensure that you import your CSS file
 import { AnimatePresence } from "framer-motion";
 import { UserProvider } from "../../context";
 import { Toaster } from "sonner";
@@ -43,19 +43,19 @@ const Main = () => {
 	}, []);
 
 	return (
-		<>
+		<div className="main-content">
 			<UserProvider>
-				<AnimatePresence mode='wait'>
+				<AnimatePresence mode="wait">
 					<Outlet />
 					<Toaster
-						position='top'
+						position="top"
 						icons={{
-							success: <PiCheckCircleFill className='text-green w-5 h-5' />,
+							success: <PiCheckCircleFill className="text-green w-5 h-5" />,
 						}}
 					/>
 				</AnimatePresence>
 			</UserProvider>
-		</>
+		</div>
 	);
 };
 

@@ -2,24 +2,51 @@ const UserModel = require('../models/userSchema');
 const DailyModel = require('../models/dailySchema');
 const SocialModel = require('../models/socialSchema');
 const AnnoucementModel = require('../models/annoucementSchema');
+const { TELEGRAM_BOT_TOKEN, CHAT_ID } = require('../Config/env');
+const { check48Hour, check24hour, check1hour } = require('../utils/timeCheckUtils');
+const { updateReferrals } = require('../utils/updateReferalUtils');
 
-const { check48Hour, check24hour } = require('../utils/timeCheckUtils');
+const upgradeCosts = [100, 200, 300];
+const tapValues = [
+    { level: 1, value: 1 },
+    { level: 2, value: 2 },
+    { level: 3, value: 3 },
+];
+
+const energyUpgradeCosts = [100, 200, 300];
+const energyValues = [
+    { level: 1, energy: 500 },
+    { level: 2, energy: 1000 },
+    { level: 3, energy: 1500 },
+];
 
 exports.getAllSocialTasks = async (req, res) => {
     try {
         const socialTasks = await SocialModel.find({});
-        res.status(200).json(socialTasks);
+        res.status(200).json({
+            status: 'success',
+            socialTasks
+        });
     } catch (error) {
-        res.status(500).json({ message: 'Error fetching social tasks', error: error.message });
+        res.status(500).json({
+            status: 'failed',
+            message: 'Internal Server Error'
+        });
     }
 };
 
 exports.getAllDailyTasks = async (req, res) => {
     try {
         const dailyTasks = await DailyModel.find({});
-        res.status(200).json(dailyTasks);
+        res.status(200).json({
+            status: 'success',
+            dailyTasks
+        });
     } catch (error) {
-        res.status(500).json({ message: 'Error fetching daily tasks', error: error.message });
+        res.status(500).json({
+            status: 'failed',
+            message: 'Internal Server Error'
+        });
     }
 };
 
@@ -49,7 +76,11 @@ exports.selection = async (req, res) => {
                             }
                         }
                     });
-                    return res.status(200).json({ button: false, value });
+                    return res.status(200).json({
+                        status: 'success',
+                        button: false,
+                        value
+                    });
                 } else {
                     if (check24hour(date)) {
                         if (day === 0) {
@@ -79,28 +110,43 @@ exports.selection = async (req, res) => {
                                 }
                             });
                         }
-                        return res.status(200).json({ button: false, value });
+                        return res.status(200).json({
+                            status: 'success',
+                            button: false,
+                            value
+                        });
                     } else {
-                        return res.status(200).json({ button: true, value: user.daily_claimed });
+                        return res.status(200).json({
+                            status: 'success',
+                            button: true,
+                            value: user.daily_claimed
+                        });
                     }
                 }
             } else {
-                return res.status(200).json({ button: false, value: { day: 0, reward: 500 } });
+                return res.status(200).json({
+                    status: 'success',
+                    button: false,
+                    value: { day: 0, reward: 500 }
+                });
             }
         } else {
-            return res.status(404).json({ message: 'User not found' });
+            return res.status(200).json({
+                status: 'failed',
+                message: 'User not found'
+            });
         }
     } catch (error) {
-        res.status(500).json({ message: 'Error fetching user data', error: error.message });
+        res.status(500).json({
+            status: 'failed',
+            message: 'Internal Server Error!'
+        });
     }
 };
 
 exports.sendUserData = async (req, res) => {
     try {
-        const queryParams = req.query;
-        let referrerId = queryParams.ref ? queryParams.ref.replace(/\D/g, "") : null;
-        let isPremium = JSON.parse(queryParams.isPremium);
-        const telegramUser = req.body.telegramUser; 
+        const { queryParams, referrerId, isPremium, telegramUser } = req.body;
 
         if (telegramUser) {
             const {
@@ -116,12 +162,11 @@ exports.sendUserData = async (req, res) => {
 
             if (existingUser) {
                 console.log("User already exists in MongoDB");
-
                 // Update referrals
                 await updateReferrals(existingUser);
-
                 // Send response with user data
                 return res.status(200).json({
+                    status: 'existingUser',
                     message: "User already exists",
                     userData: existingUser,
                 });
@@ -186,7 +231,7 @@ exports.sendUserData = async (req, res) => {
             };
 
             // Save new user in MongoDB
-            const newUser = new TelegramUser(userData);
+            const newUser = new UserModel(userData);
             await newUser.save();
 
             // Update referrer information if available
@@ -202,44 +247,43 @@ exports.sendUserData = async (req, res) => {
                         level: { id: 1, name: "Bronze", imgUrl: "/bronze.webp" },
                     });
                     await referrer.save();
-
-                    // Optionally, you can update the referrer’s balance and send it in the response
                 }
             }
-
             // Send response with new user data
-            res.status(201).json({
+            res.status(200).json({
+                status: 'newUser',
                 message: "New user created",
                 userData: newUser,
             });
         } else {
-            res.status(400).json({ message: "Telegram user data is required" });
+            res.status(200).json({
+                status: 'failed',
+                message: "Telegram user data is required"
+            });
         }
     } catch (error) {
         console.error("Error saving user in MongoDB:", error);
-        res.status(500).json({ message: "Internal server error" });
+        res.status(500).json({
+            status: 'failed',
+            message: "Internal server error"
+        });
     }
 };
 
 exports.claimRewardsOfReferals = async (req, res) => {
     const { referrerId, claimList } = req.body;
-
     try {
         let totalReward = 0;
-
         // Calculate the total reward
         claimList.forEach((claim) => {
             totalReward += claim.isPremium ? 25000 : 10000;
         });
-
         // Find the referrer in the MongoDB database
         const referrer = await UserModel.findOne({ userId: referrerId });
-
         if (referrer) {
             // Update the balance
             const currentBalance = referrer.balance || 0;
             const newBalance = currentBalance + totalReward;
-
             // Update the user's balance and claim list
             const updatedClaimList = claimList.map((claim) => {
                 if (!claim.status) {
@@ -247,7 +291,6 @@ exports.claimRewardsOfReferals = async (req, res) => {
                 }
                 return claim;
             });
-
             // Update the referrer document in MongoDB
             await UserModel.updateOne(
                 { userId: referrerId },
@@ -258,14 +301,21 @@ exports.claimRewardsOfReferals = async (req, res) => {
                     },
                 }
             );
-
-            res.status(200).json({ success: true });
+            res.status(200).json({
+                status: 'success',
+                balance: newBalance
+            });
         } else {
-            res.status(404).json({ success: false, message: "Referrer not found" });
+            res.status(200).json({
+                status: 'failed',
+                message: "Referrer not found"
+            });
         }
     } catch (error) {
-        console.error("Error claiming rewards:", error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({
+            status: "failed",
+            message: "Internal Server Error!"
+        });
     }
 };
 
@@ -293,65 +343,77 @@ exports.fetchUsersDay = async (req, res) => {
         const users = await query.exec();
 
         // Send the response
-        res.json(users);
+        res.status(200).json({
+            status: 'success',
+            users: users
+        });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Internal Server Error' });
+        res.status(500).json({
+            status: 'failed',
+            message: 'Internal Server Error'
+        });
     }
 };
 
 exports.fetchUsersWeek = async (req, res) => {
     try {
-        let { query } = req.body;
-
+        const { queryValue } = req.body;
+    
+        let query;
+    
         if (queryValue) {
+            // Query for matching usernames and sort by balance in descending order
             query = UserModel.find({
                 username: { $gte: queryValue, $lte: queryValue + '\uf8ff' }
             }).sort({ balance: -1 });
         } else {
+            // If no queryValue, get all users and sort by balance in descending order
             query = UserModel.find().sort({ balance: -1 });
         }
-
+    
         const users = await query.exec();
-
-        // Process users if needed
-        // Example: you can return or process the users here
+    
+        // Respond with the retrieved users
         return res.status(200).json({
             status: 'success',
             users: users
         });
     } catch (error) {
-        console.error('Error fetching users:', error);
-        throw new Error('Error fetching users');
-    }
+        // Handle errors and send a 500 status with a failure message
+        return res.status(500).json({
+            status: 'failed',
+            message: 'Internal Server Error!'
+        });
+    }    
 };
 
 exports.calculateOverallBalance = async (req, res) => {
     try {
         // Fetch all users from the database
         const users = await UserModel.find({});
-        
-        // Log all documents to see their data
-        users.forEach((user) => {
-            console.log(`Document ID: ${user._id}`, user);
-        });
 
         // Safely extract the balance field and sum it up
         const totalBalance = users.reduce((sum, user) => {
             const balance = user.balance;
-            console.log(`Balance for document ${user._id}:`, balance, sum); // Debug log
             return sum + (balance || 0); // Add balance to sum or 0 if undefined
         }, 0);
 
-        console.log("Total Balance:", totalBalance); // Log the total balance
-
         // Return the total balance as a response
-        res.status(200).json({ totalBalance });
+        res.status(200).json({
+            status: 'success',
+            balance: totalBalance
+        });
     } catch (error) {
-        console.error("Error calculating overall balance:", error);
-        res.status(500).json({ error: "Internal server error" });
+        // Return an error response if something goes wrong
+        if (!res.headersSent) {
+            res.status(500).json({
+                status: 'failed',
+                message: "Internal server error"
+            });
+        }
     }
 };
+
 
 exports.updateTwitterName = async (req, res) => {
     const { id, twitterUserName } = req.body;
@@ -363,15 +425,21 @@ exports.updateTwitterName = async (req, res) => {
             { twitterUserName: twitterUserName },
             { new: true, runValidators: true }
         );
-
         if (!user) {
-            return res.status(404).json({ message: 'User not found' });
+            return res.status(200).json({
+                status: 'failed',
+                message: 'User not found'
+            });
         }
-
-        res.status(200).json(user);
+        res.status(200).json({
+            status: 'success',
+            user
+        });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server error' });
+        res.status(500).json({
+            status: 'failed',
+            message: 'Server error'
+        });
     }
 };
 
@@ -394,21 +462,28 @@ exports.updateAnnouncementLink = async (req, res) => {
         );
 
         if (!updatedAnnouncement) {
-            return res.status(404).json({ message: 'Announcement not found' });
+            return res.status(200).json({
+                status: 'failed',
+                message: 'Announcement not found'
+            });
         }
-
         // Send a success response
-        res.status(200).json(updatedAnnouncement);
+        res.status(200).json({
+            status: 'success',
+            updatedAnnouncement
+        });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server error' });
+        res.status(500).json({
+            status: 'failed',
+            message: 'Internal Server Error!'
+        });
     }
 };
 
 exports.fetchAnnouncementReward = async (req, res) => {
     try {
         // Find the user by ID
-        const {id } = req.body;
+        const { id } = req.body;
         const user = await UserModel.findById(id);
 
         if (user) {
@@ -434,28 +509,32 @@ exports.fetchAnnouncementReward = async (req, res) => {
                     timestamp: null,
                 });
             } else {
-                return res.status(200).json({rewardData});
+                return res.status(200).json({
+                    status: 'success',
+                    rewardData
+                });
             }
         } else {
             return res.status(200).json({
+                status: 'failed',
                 link: "",
                 status: "notVerified",
                 timestamp: null,
             });
         }
     } catch (error) {
-        console.error("Error fetching announcement reward:", error);
-        return {
+        return res.status(200).json({
+            status: 'failed',
             link: "",
             status: "notVerified",
             timestamp: null,
-        };
+        });
     }
 };
 
 exports.updateWalletAddress = async (req, res) => {
     try {
-        const {userId, walletAddress } = req.body;
+        const { userId, walletAddress } = req.body;
         // Find the user by userId and update the wallet address
         const result = await UserModel.findOneAndUpdate(
             { userId: userId }, // Query to find the user
@@ -464,71 +543,26 @@ exports.updateWalletAddress = async (req, res) => {
         );
 
         // Return the updated user document (if needed)
-        return res.status(200).json({result});
-    } catch (error) {
-        console.error('Error updating wallet address:', error);
-        throw error; // Re-throw the error to be handled by the calling function
-    }
-};
-
-exports.updateReferrals = async (req, res) => {
-    try {
-        const { userId } = req.body;
-        // Find the user by ID
-        const user = await UserModel.findOne({ userId });
-        if (!user) {
-            return res.status(200).json({
-                status: 'failed',
-                message: 'User not found!'
-            });
-        }
-        
-        const referrals = user.referrals || [];
-
-        // Fetch referral details
-        const updatedReferrals = await Promise.all(
-            referrals.map(async (referralId) => {
-                const referral = await UserModel.findOne({ userId: referralId });
-                if (referral) {
-                    return res.status(200).json({
-                        userId: referral.userId,
-                        balance: referral.balance,
-                        level: referral.level,
-                    });
-                }
-                return res.status(200).json({ 
-                    userId: referralId 
-                });
-            })
-        );
-
-        // Update the user document with updated referrals
-        await UserModel.updateOne({ userId }, { referrals: updatedReferrals });
-
-        // Calculate referrer bonus
-        const totalEarnings = updatedReferrals.reduce(
-            (acc, curr) => acc + (curr.balance || 0),
-            0
-        );
-        const refBonus = Math.floor(totalEarnings * 0.1);
-        const totalBalance = user.totalBalance + refBonus;
-
-        // Update user document with refBonus and totalBalance
-        await UserModel.updateOne(
-            { userId },
-            { $set: { refBonus, totalBalance } }
-        );
-
-        console.log("Referrer bonus updated in database");
-        console.log("Your balance is:", totalBalance);
         return res.status(200).json({
             status: 'success',
-            balance: totalBalance
-        })
+            result
+        });
     } catch (error) {
-        console.error("Error updating referrer bonus:", error);
+        return res.status(200).json({
+            status: 'failed',
+            message: "Internal Server Error!"
+        });
     }
 };
+
+exports.updateReferralsReq = async (req, res) => {
+    const { userId } = req.body;
+    
+    const result = await updateReferrals(userId);
+
+    // Send the result as a response
+    return res.status(result.status === 'success3' ? 200 : 400).json(result);
+}
 
 exports.fetchTasks = async (req, res) => {
     try {
@@ -542,10 +576,15 @@ exports.fetchTasks = async (req, res) => {
             announcements
         };
 
-        res.status(200).json(tasksData);
+        res.status(200).json({
+            status: 'success',
+            tasksData
+        });
     } catch (error) {
-        console.error("Error fetching tasks: ", error);
-        res.status(500).json({ error: "Error fetching tasks" });
+        res.status(500).json({
+            status: 'failed',
+            message: "Error fetching tasks"
+        });
     }
 };
 
@@ -592,7 +631,10 @@ exports.fetchReferrals = async (req, res) => {
         }
 
         // Send back the referrals list
-        res.status(200).json({ referrals: user.referrals || [] });
+        res.status(200).json({
+            status: 'success',
+            referrals: user.referrals || []
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error' });
@@ -604,10 +646,16 @@ exports.fetchAnnouncement = async (req, res) => {
         const announcement = await AnnoucementModel.findOne({ status: true }).sort({ createdAt: -1 });
 
         if (!announcement) {
-            return res.status(404).json({ message: "No announcements found with status true!" });
+            return res.status(200).json({
+                status: 'failed',
+                message: "No announcements found with status true!"
+            });
         }
 
-        res.status(200).json(announcement);
+        res.status(200).json({
+            status: 'success',
+            announcement
+        });
     } catch (error) {
         console.error("Error fetching announcement:", error);
         res.status(500).json({ message: "Error fetching announcement." });
@@ -615,7 +663,7 @@ exports.fetchAnnouncement = async (req, res) => {
 };
 
 exports.updateUserLevel = async (req, res) => {
-    const {userId, newTapBalance} = req.body;
+    const { userId, newTapBalance } = req.body;
     let newLevel = { id: 1, name: "Bronze", imgUrl: "/bronze.webp" };
 
     if (newTapBalance >= 1000 && newTapBalance < 50000) {
@@ -635,7 +683,10 @@ exports.updateUserLevel = async (req, res) => {
         const user = await UserModel.findOne({ userId: userId });
 
         if (!user) {
-            throw new Error('User not found');
+            return res.status(200).json({
+                status: 'failed',
+                message: 'User not found!'
+            })
         }
 
         // Check if the level needs to be updated
@@ -664,7 +715,7 @@ exports.checkAndUpdateFreeGuru = async (req, res) => {
             // Extract the lastDate and format it
             const lastDate = new Date(user.timeSta); // Convert the timeSta string to a Date object
             const formattedDates = lastDate.toISOString().split("T")[0]; // Get the date part in YYYY-MM-DD format
-            
+
             // Get the current date and format it
             const currentDate = new Date(); // Get the current date
             const formattedCurrentDates = currentDate.toISOString().split("T")[0]; // Get the date part in YYYY-MM-DD format
@@ -673,22 +724,23 @@ exports.checkAndUpdateFreeGuru = async (req, res) => {
                 // Update the user's freeGuru and timeSta
                 await UserModel.updateOne(
                     { userId },
-                    { 
-                        freeGuru: 3, 
-                        timeSta: new Date() 
+                    {
+                        freeGuru: 3,
+                        timeSta: new Date()
                     }
                 );
 
                 // You can return a success message or perform other actions
                 return res.status(200).json({
-                    success: true, freeGuru: 3 
+                    success: true,
+                    freeGuru: 3
                 });
             }
         }
 
         return res.status(200).json({
-            success: false, 
-            message: 'User not found or no update needed' 
+            success: false,
+            message: 'User not found or no update needed'
         })
     } catch (error) {
         console.error('Error updating freeGuru:', error);
@@ -700,14 +752,14 @@ exports.checkAndUpdateFullTank = async (req, res) => {
     try {
         const { id } = req.body;
         const user = await UserModel.findById(id);
-        
+
         if (user) {
             // Convert lastDateTank to JS Date
             const lastDateTank = new Date(user.timeStaTank);
             const formattedDate = lastDateTank.toISOString().split("T")[0]; // YYYY-MM-DD
-            const currentDate = new Date(); 
+            const currentDate = new Date();
             const formattedCurrentDate = currentDate.toISOString().split("T")[0]; // YYYY-MM-DD
-            
+
             if (formattedDate !== formattedCurrentDate && user.fullTank <= 0) {
                 // Update the user's fullTank and timeStaTank
                 user.fullTank = 3;
@@ -716,15 +768,21 @@ exports.checkAndUpdateFullTank = async (req, res) => {
 
                 // Optionally return or handle the updated value
                 return res.status(200).json({
+                    success: true,
                     fullTank: user.fullTank
-                })            }
+                })
+            }
         }
         return res.status(200).json({
+            success: false,
             fullTank: null
         }) // Return null if user not found or no update needed
     } catch (error) {
         console.error('Error checking and updating full tank:', error);
-        throw error; // Rethrow error for handling in higher levels
+        return res.status(200).json({
+            status: 'failed',
+            message: "Internal Server Error!"
+        })
     }
 };
 
@@ -747,16 +805,17 @@ exports.fetchStartTimeTap = async (req, res) => {
             const oneHourInMillis = 1 * 60 * 60 * 1000; // One hour in milliseconds
 
             if (timePassed >= oneHourInMillis) {
-                return res.json({ startTime: false, doubleBoost: false });
+                return res.json({ status: 'success1', startTime: false, doubleBoost: false });
             } else {
                 const remainingTime = oneHourInMillis - timePassed;
                 return res.json({
+                    status: 'success2',
                     startTime: true,
                     timeLeft: Math.floor(remainingTime / 1000), // Time left in seconds
                 });
             }
         } else {
-            return res.json({ startTime: false, doubleBoost: false });
+            return res.json({ status: 'success3', startTime: false, doubleBoost: false });
         }
     } catch (error) {
         console.error(error);
@@ -769,10 +828,13 @@ exports.fetchStartTimePowerTap = async (req, res) => {
         const { id } = req.params;
 
         // Fetch user from MongoDB
-        const user = await UserModel.findOne({ userId: id });
+        const user = await UserModel.findById(id);
 
         if (!user) {
-            return res.status(404).json({ message: 'User not found' });
+            return res.status(200).json({ 
+                status: 'failed', 
+                message: 'User not found' 
+            });
         }
 
         if (user.power_tap && user.power_tap.rewardTimer) {
@@ -783,18 +845,21 @@ exports.fetchStartTimePowerTap = async (req, res) => {
 
             if (timePassed >= oneHourInMillis) {
                 res.json({
+                    status: 'success1',
                     startTimePower: false,
                     powerBootStart: false
                 });
             } else {
                 const remainingTime = oneHourInMillis - timePassed;
                 res.json({
+                    status: 'success2',
                     startTimePower: true,
                     powerTimeLeft: Math.floor(remainingTime / 1000) // Convert to seconds
                 });
             }
         } else {
             res.json({
+                status: 'success3',
                 startTimePower: false,
                 powerBootStart: false
             });
@@ -804,5 +869,467 @@ exports.fetchStartTimePowerTap = async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 }
+
+exports.updateData = async (req, res) => {
+    const { userId, balance, energy, tapBalance } = req.body;
+
+    if (!userId || balance === undefined || energy === undefined || tapBalance === undefined) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        const user = await UserModel.findOneAndUpdate(
+            { userId },
+            { balance, energy, tapBalance },
+            { new: true, runValidators: true }
+        );
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        res.status(200).json(user);
+    } catch (error) {
+        console.error('Error updating user:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+exports.handleClaim = async (req, res) => {
+    const { userId, reward, day } = req.body;
+
+    try {
+        const user = await User.findOne({ userId });
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        const { daily_claimed } = user;
+        const { date, claimed } = daily_claimed;
+        const newBalance = user.balance + reward;
+
+        if (date !== "" && !check24hour(date)) {
+            return res.status(400).json({ message: 'You have already claimed today\'s reward.' });
+        }
+
+        user.balance = newBalance;
+        user.daily_claimed = {
+            claimed: [...claimed, day],
+            day: Number(day),
+            reward,
+            date: serverTimestamp(), // Adjust this to match your server timestamp implementation
+        };
+
+        if (day === 6) {
+            user.daily_claimed.claimed = [];
+        }
+
+        await user.save();
+        res.status(200).json({ message: 'Reward claimed successfully.', user });
+    } catch (error) {
+        console.error('Error claiming reward:', error);
+        res.status(500).json({ message: 'Internal server error.' });
+    }
+};
+
+exports.verifyTelegram = async (req, res) => {
+    const { userId } = req.body;
+
+    try {
+        const response = await fetch(
+            `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getChatMember?chat_id=${CHAT_ID}&user_id=${Number(userId)}`
+        );
+
+        const data = await response.json();
+
+        if (
+            data.ok &&
+            (data.result.status === 'member' ||
+                data.result.status === 'administrator' ||
+                data.result.status === 'creator')
+        ) {
+            res.status(200).json({ isMember: true });
+        } else {
+            res.status(400).json({ isMember: false, message: 'Not a member of the Telegram channel.' });
+        }
+    } catch (error) {
+        console.error('Error verifying Telegram status:', error);
+        res.status(500).json({ message: 'Internal server error.' });
+    }
+}
+
+exports.claimTask = async (req, res) => {
+    const { userId, amount, taskId, image } = req.body;
+
+    try {
+        // Telegram-specific verification
+        if (image === 'telegram') {
+            const response = await fetch(
+                `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getChatMember?chat_id=${CHAT_ID}&user_id=${Number(userId)}`
+            );
+
+            const data = await response.json();
+
+            if (
+                !data.ok ||
+                !(data.result.status === 'member' ||
+                    data.result.status === 'administrator' ||
+                    data.result.status === 'creator')
+            ) {
+                return res.status(400).json({ message: 'Please join the Telegram channel first.' });
+            }
+        }
+
+        const user = await UserModel.findOne({ userId });
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        const { balance, task_lists = [] } = user;
+        const newBalance = balance + Number(amount);
+
+        // Ensure the task has not been claimed yet
+        if (!task_lists.includes(taskId)) {
+            user.balance = newBalance;
+            user.task_lists = [...task_lists, taskId];
+
+            await user.save();
+            res.status(200).json({ message: 'Reward has been claimed successfully.', newBalance });
+        } else {
+            res.status(400).json({ message: 'This task has already been claimed.' });
+        }
+    } catch (error) {
+        console.error('Error claiming task:', error);
+        res.status(500).json({ message: 'Internal server error.' });
+    }
+}
+
+exports.claimDailyTask = async (req, res) => {
+    const { userId, amount, taskId } = req.body;
+
+    try {
+        const user = await User.findOne({ userId });
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        const { balance, daily_task_lists = [] } = user;
+        const newBalance = balance + Number(amount);
+
+        // Ensure the task has not been claimed yet
+        if (!daily_task_lists.includes(taskId)) {
+            user.balance = newBalance;
+            user.daily_task_lists = [...daily_task_lists, taskId];
+
+            await user.save();
+            res.status(200).json({ message: 'Reward has been claimed successfully.', newBalance });
+        } else {
+            res.status(400).json({ message: 'This task has already been claimed.' });
+        }
+    } catch (error) {
+        console.error('Error claiming daily task:', error);
+        res.status(500).json({ message: 'Internal server error.' });
+    }
+}
+
+exports.handleAnnoucement = async (req, res) => {
+    const { userId, amount, currentAnnouncementLink, isValidURL } = req.body;
+
+    try {
+        if (isValidURL && currentAnnouncementLink !== "") {
+            await updateAnnouncementLink(currentAnnouncementLink, "verifying");
+            res.status(200).json({ message: "URL saved successfully" });
+
+            // Wait for 20 seconds before verifying
+            setTimeout(async () => {
+                try {
+                    await updateAnnouncementLink(currentAnnouncementLink, "verified");
+
+                    const user = await User.findOne({ userId });
+
+                    if (user) {
+                        const { balance, announcementReward } = user;
+                        if (announcementReward && announcementReward.status === "verified") {
+                            const newBalance = Number(balance) + Number(amount);
+
+                            user.balance = newBalance;
+                            await user.save();
+
+                            res.status(200).json({
+                                message: "Reward has been claimed successfully!",
+                                newBalance,
+                            });
+                        } else {
+                            res.status(400).json({ message: "Announcement reward is not verified." });
+                        }
+                    } else {
+                        res.status(404).json({ message: "User document does not exist." });
+                    }
+                } catch (rewardError) {
+                    console.error("Error during reward claiming: ", rewardError);
+                    res.status(500).json({ message: "An error occurred while claiming the reward." });
+                }
+            }, 20000);
+        } else {
+            res.status(400).json({ message: "Please enter a valid URL" });
+        }
+    } catch (error) {
+        console.error("Error updating announcement: ", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+}
+
+exports.upgrade = async (req, res) => {
+    const { userId, balance, tapValue, refBonus } = req.body;
+
+    try {
+        const nextLevel = tapValue.level;
+        const upgradeCost = upgradeCosts[nextLevel];
+
+        if (nextLevel < tapValues.length && balance + refBonus >= upgradeCost) {
+            const newTapValue = tapValues[nextLevel];
+            const user = await User.findOne({ userId });
+
+            if (!user) {
+                return res.status(404).json({ message: 'User not found.' });
+            }
+
+            user.tapValue = newTapValue;
+            user.balance -= upgradeCost;
+
+            await user.save();
+
+            res.status(200).json({
+                message: `Upgrade is yours! Multitap Level ${newTapValue.level}`,
+                newTapValue,
+                newBalance: user.balance,
+            });
+        } else {
+            res.status(400).json({ message: 'Not enough balance or invalid level.' });
+        }
+    } catch (error) {
+        console.error('Error updating tap value:', error);
+        res.status(500).json({ message: 'Internal server error.' });
+    }
+}
+
+exports.energyUpgrade = async (req, res) => {
+    const { userId, balance, battery, refBonus } = req.body;
+
+    try {
+        const nextEnergyLevel = battery.level;
+        const energyUpgradeCost = energyUpgradeCosts[nextEnergyLevel];
+
+        if (nextEnergyLevel < energyValues.length && balance + refBonus >= energyUpgradeCost) {
+            const newEnergyValue = energyValues[nextEnergyLevel];
+            const user = await User.findOne({ userId });
+
+            if (!user) {
+                return res.status(404).json({ message: 'User not found.' });
+            }
+
+            user.battery = {
+                level: newEnergyValue.level,
+                energy: newEnergyValue.energy + 500,
+            };
+            user.balance -= energyUpgradeCost;
+            user.energy = newEnergyValue.energy + 500;
+
+            await user.save();
+
+            res.status(200).json({
+                message: `Upgrade is yours! Energy limit Level ${newEnergyValue.level}`,
+                newEnergyValue,
+                newBalance: user.balance,
+            });
+        } else {
+            res.status(400).json({ message: 'Not enough balance or invalid level.' });
+        }
+    } catch (error) {
+        console.error('Error updating energy value:', error);
+        res.status(500).json({ message: 'Internal server error.' });
+    }
+}
+
+exports.fetchStartTime = async (req, res) => {
+    const { userId } = req.body;
+
+    try {
+        const user = await User.findOne({ userId });
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        const { double_booster } = user;
+        const startTime = double_booster?.startAt ? new Date(double_booster.startAt) : "";
+
+        if (startTime) {
+            const currentTime = Date.now();
+            const timePassed = currentTime - startTime.getTime();
+            const oneDayInMillis = 24 * 60 * 60 * 1000;
+
+            if (timePassed >= oneDayInMillis) {
+                user.double_booster = {
+                    startAt: "",
+                    rewardTimer: "",
+                    rewardStart: false,
+                    rewardClaimed: 0,
+                };
+
+                await user.save();
+
+                res.status(200).json({
+                    message: 'Double booster expired and reset successfully.',
+                    currentReward: 0,
+                });
+            } else {
+                res.status(200).json({ message: 'Double booster is still active.' });
+            }
+        } else {
+            res.status(200).json({ message: 'No double booster start time found.' });
+        }
+    } catch (error) {
+        console.error('Error fetching start time:', error);
+        res.status(500).json({ message: 'Internal server error.' });
+    }
+}
+
+exports.fetchStartTimePowerTaps = async (req, res) => {
+    const { userId } = req.body;
+
+    try {
+        const user = await User.findOne({ userId });
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        const { power_tap } = user;
+        const startTime = power_tap?.startAt ? new Date(power_tap.startAt) : "";
+
+        if (startTime) {
+            const currentTime = Date.now();
+            const timePassed = currentTime - startTime.getTime();
+            const oneDayInMillis = 24 * 60 * 60 * 1000;
+
+            if (timePassed >= oneDayInMillis) {
+                user.power_tap = {
+                    startAt: "",
+                    rewardTimer: "",
+                    rewardStart: false,
+                    rewardClaimed: "",
+                };
+
+                await user.save();
+
+                res.status(200).json({
+                    message: 'Power tap expired and reset successfully.',
+                    newPowerIndex: 0,
+                });
+            } else {
+                res.status(200).json({ message: 'Power tap is still active.' });
+            }
+        } else {
+            res.status(200).json({ message: 'No power tap start time found.' });
+        }
+    } catch (error) {
+        console.error('Error fetching power tap start time:', error);
+        res.status(500).json({ message: 'Internal server error.' });
+    }
+}
+
+exports.HandlePowerTap = async (req, res) => {
+    const { userId } = req.body;
+
+    try {
+        const user = await User.findOne({ userId });
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        const { power_tap } = user;
+
+        if (power_tap.rewardClaimed >= 3) {
+            return res.status(400).json({ message: 'Come after 24 hours' });
+        }
+
+        const rewardTimerExpired = power_tap.rewardTimer && check1hour(power_tap.rewardTimer);
+        const startAt = power_tap.startAt || new Date();
+        const rewardClaimed = power_tap.rewardClaimed + 1;
+
+        if (rewardTimerExpired || !power_tap.rewardTimer) {
+            user.power_tap = {
+                rewardStart: true,
+                startAt: startAt,
+                rewardTimer: new Date(),
+                rewardClaimed: rewardClaimed,
+            };
+
+            await user.save();
+
+            res.status(200).json({
+                message: 'You can tap unlimited times for 1 minute',
+                newPowerIndex: rewardClaimed,
+            });
+        } else {
+            res.status(400).json({ message: 'PowerTap already enabled' });
+        }
+    } catch (error) {
+        console.error('Error handling power tap:', error);
+        res.status(500).json({ message: 'Internal server error.' });
+    }
+}
+
+exports.HandleSetIndex = async (req, res) => {
+    const { userId } = req.body;
+
+    try {
+        const user = await User.findOne({ userId });
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        const { double_booster } = user;
+
+        if (double_booster.rewardClaimed >= 3) {
+            return res.status(400).json({ message: 'Come after 24 hours' });
+        }
+
+        const rewardTimerExpired = double_booster.rewardTimer && check1hour(double_booster.rewardTimer);
+        const startAt = double_booster.startAt || new Date();
+        const rewardClaimed = double_booster.rewardClaimed + 1;
+
+        if (rewardTimerExpired || !double_booster.rewardTimer) {
+            user.double_booster = {
+                rewardStart: true,
+                startAt: startAt,
+                rewardTimer: new Date(),
+                rewardClaimed: rewardClaimed,
+            };
+
+            await user.save();
+
+            res.status(200).json({
+                message: 'You can tap unlimited times for 1 minute',
+                newRewardClaimed: rewardClaimed,
+            });
+        } else {
+            res.status(400).json({ message: 'Booster already enabled' });
+        }
+    } catch (error) {
+        console.error('Error handling double booster:', error);
+        res.status(500).json({ message: 'Internal server error.' });
+    }
+}
+
+
+
+
 
 

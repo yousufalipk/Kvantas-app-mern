@@ -6,21 +6,16 @@
 @import url("https://fonts.googleapis.com/css2?family=Krona+One&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Oxanium&display=swap");
 
-:root {
-	--app-height: 100vh;
-}
-
-#root,
-.app-container {
-	height: 100%;
-	min-height: var(--app-height);
+/* Flex container for the app layout, ensuring full height */
+html, body, #root, .app-container {
 	display: flex;
 	flex-direction: column;
+	margin: 0px;
+	padding: 0px;
 }
 
+/* Ensure body styling and font are set */
 body {
-	height: var(--app-height);
-	margin: 0;
 	font-family: "Open Sans", sans-serif;
 	font-optical-sizing: auto;
 	font-style: normal;
@@ -28,28 +23,48 @@ body {
 	-moz-osx-font-smoothing: grayscale;
 }
 
+/* Define font for code elements */
 code {
-	font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
-		monospace;
+	font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
 }
 
+/* Utility class for Krona One font */
 .krona {
 	font-family: "Krona One", sans-serif;
 }
 
+/* Styling for notifications with a gradient text effect */
 .notification {
 	font-size: 20px;
-	font-family: "Oxanium";
-	background: -webkit-linear-gradient(#eee, #68fe43);
+	font-family: "Oxanium", sans-serif;
+	background: linear-gradient(to right, #eee, #68fe43);
 	-webkit-background-clip: text;
 	-webkit-text-fill-color: transparent;
 }
 
+/* Button styling with a gradient background */
 .moreLinkButton {
 	background: linear-gradient(
 		109.67deg,
 		#3919ff -4.47%,
 		#1c020d -4.47%,
 		#2a0d81 60.98%
+	);
+	color: white;
+	padding: 10px 20px;
+	border-radius: 8px;
+	font-family: "Open Sans", sans-serif;
+	font-weight: 600;
+	text-transform: uppercase;
+	cursor: pointer;
+	transition: background 0.3s ease;
+}
+
+/* Add a hover effect to the button */
+.moreLinkButton:hover {
+	background: linear-gradient(
+		109.67deg,
+		#2a0d81 -4.47%,
+		#3919ff 60.98%
 	);
 }

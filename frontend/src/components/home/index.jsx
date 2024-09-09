@@ -1,28 +1,25 @@
 import { useEffect, useRef, useState } from "react";
-
-import { doc, getDoc, updateDoc } from "@firebase/firestore";
-import { db } from "../../config/firebase";
 import { useUser } from "../../context";
 import { add, award, kvaiCoin, robot, shadow, star } from "../../assets";
 import Footer from "../common/footer";
 import styled, { keyframes } from "styled-components";
 import { Link } from "react-router-dom";
 import Loader from "../common/loader";
-import Notification from "../notification";
 import { notify, notifyError } from "../../utils/notify";
+import axios from "axios";
 
 const tele = window.Telegram.WebApp;
 tele.disableVerticalSwipes();
 
 const slideUp = keyframes`
-  0% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(-350px);
-  }
+	0% {
+		opacity: 1;
+		transform: translateY(0);
+	}
+	100% {
+		opacity: 0;
+		transform: translateY(-350px);
+	}
 `;
 
 const SlideUpText = styled.div`
@@ -45,6 +42,7 @@ const Container = styled.div`
 `;
 
 const Home = () => {
+	const apiUrl = process.env.REACT_APP_API_URL;
 	const imageRef = useRef(null);
 	const [clicks, setClicks] = useState([]);
 	const {
@@ -55,8 +53,6 @@ const Home = () => {
 		tapBalance,
 		energy,
 		battery,
-		tapGuru,
-		mainTap,
 		setIsRefilling,
 		isRefilling,
 		refillIntervalRef,
@@ -72,6 +68,8 @@ const Home = () => {
 		claimList,
 		claimRewardsOfReferals,
 	} = useUser();
+	
+	const staticUser = process.env.REACT_APP_STATIC_USER;
 	const [isDisabled, setIsDisabled] = useState(false);
 	const [claimListHere, setClaimListHere] = useState(claimList);
 	const [points, setPoints] = useState(0);
@@ -231,10 +229,10 @@ const Home = () => {
 			offsetX < horizontalMidpoint
 				? "wobble-left"
 				: offsetX > horizontalMidpoint
-				? "wobble-right"
-				: offsetY < verticalMidpoint
-				? "wobble-top"
-				: "wobble-bottom";
+					? "wobble-right"
+					: offsetY < verticalMidpoint
+						? "wobble-top"
+						: "wobble-bottom";
 
 		// Remove previous animations
 		imageRef.current.classList.remove(
@@ -271,21 +269,21 @@ const Home = () => {
 		setPoints((prevPoints) => prevPoints + 1);
 		doubleBoostStart
 			? setBalance((prevBalance) => {
-					const newBalance = prevBalance + tapValue.value * 2;
-					accumulatedBalanceRef.current = newBalance;
-					return newBalance;
-			  })
+				const newBalance = prevBalance + tapValue.value * 2;
+				accumulatedBalanceRef.current = newBalance;
+				return newBalance;
+			})
 			: powerBoostStart
-			? setBalance((prevBalance) => {
+				? setBalance((prevBalance) => {
 					const newBalance = prevBalance + tapValue.value * 5;
 					accumulatedBalanceRef.current = newBalance;
 					return newBalance;
-			  })
-			: setBalance((prevBalance) => {
+				})
+				: setBalance((prevBalance) => {
 					const newBalance = prevBalance + tapValue.value;
 					accumulatedBalanceRef.current = newBalance;
 					return newBalance;
-			  });
+				});
 
 		setTapBalance((prevTapBalance) => {
 			const newTapBalance = prevTapBalance + 1;
@@ -302,7 +300,7 @@ const Home = () => {
 
 		// Reset the debounce timer
 		clearTimeout(debounceTimerRef.current);
-		debounceTimerRef.current = setTimeout(updateFirestore, 200); // Adjust the delay as needed
+		debounceTimerRef.current = setTimeout(updateUserData, 200); // Adjust the delay as needed
 
 		clearInterval(refillIntervalRef.current); // Stop refilling while the user is active
 		setIsRefilling(false); // Set refilling state to false
@@ -366,26 +364,46 @@ const Home = () => {
 		};
 	}, []);
 
-	const updateFirestore = async () => {
-		const telegramUser = window.Telegram.WebApp.initDataUnsafe?.user;
+	const updateUserData = async () => {
+
+		let telegramUser, finalUsername;
+		if (staticUser === 'true') {
+			telegramUser = {
+				id: '03021223335',
+				first_name: 'John',
+				last_name: 'Doe',
+				username: 'johndoe_1'
+			};
+			finalUsername = username || `${telegramUser.first_name}_${telegramUser.last_name}`;
+		} else {
+			telegramUser = window.Telegram.WebApp.initDataUnsafe?.user;
+			if (!telegramUser) {
+				return;
+			}
+			finalUsername = username || `${telegramUser.first_name}_${telegramUser.last_name}`;
+		}
 		if (telegramUser) {
-			const { id: userId } = telegramUser;
-			const userRef = doc(db, "telegramUsers", userId.toString());
-
+			const userId = telegramUser.id;
 			isUpdatingRef.current = true;
-
 			try {
-				await updateDoc(userRef, {
+				// Send a PUT request to your Node.js API using axios
+				const response = await axios.put(`${apiUrl}/update-data`, {
+					userId: userId,
 					balance: accumulatedBalanceRef.current,
 					energy: accumulatedEnergyRef.current,
 					tapBalance: accumulatedTapBalanceRef.current,
 				});
-
-				accumulatedBalanceRef.current = balance;
-				accumulatedEnergyRef.current = energy;
-				accumulatedTapBalanceRef.current = tapBalance;
+	
+				// Handle the response and update the state
+				const updatedUser = response.data;
+	
+				// Update the accumulated values in your frontend
+				accumulatedBalanceRef.current = updatedUser.balance;
+				accumulatedEnergyRef.current = updatedUser.energy;
+				accumulatedTapBalanceRef.current = updatedUser.tapBalance;
+	
 			} catch (error) {
-				console.error("Error updating balance and energy:", error);
+				console.error('Error updating user:', error);
 			} finally {
 				isUpdatingRef.current = false;
 			}
@@ -409,14 +427,13 @@ const Home = () => {
 	return (
 		<>
 			<div>
-				<div className={`${loader ? "block" : "hidden"} w-full h-full`}>
+				<div className={`${loader ? "block" : "hidden"} w-screen h-screen`}>
 					<Loader />
 				</div>
 
 				<div
-					className={`${
-						claimListHere.length !== 0 && openPopup ? "visible" : "invisible"
-					} absolute bottom-5 left-0 right-0 bg-[#000000B2]`}>
+					className={`${claimListHere.length !== 0 && openPopup ? "visible" : "invisible"
+						} absolute bottom-5 left-0 right-0 bg-[#000000B2]`}>
 					<div
 						className={` fixed bottom-0 left-0 right-0 h-fit modal_background  z-50 backdrop-blur-sm  border-t-[3px] border-[#A51CF5] rounded-tl-[20px] rounded-tr-[20px] flex justify-center container-1 pb-[12px] pt-[51px] text-white bg-[#0A031880]`}>
 						<div className='w-full flex flex-col justify-between'>
@@ -500,9 +517,8 @@ const Home = () => {
 
 				<div
 					className={`w-full min-h-screen text-white flex flex-col px-3 items-center gap-6 font-sans
-				bg-[url('/src/assets/MainBackground.png')] bg-cover ${
-					loader ? "hidden" : "block"
-				}`}>
+				bg-[url('/src/assets/MainBackground.png')] bg-cover ${loader ? "hidden" : "block"
+						}`}>
 					<div className=' w-full flex justify-end  sticky top-0 pt-5  '>
 						<div className='flex justify-between  gap-4 items-center w-full'>
 							<div className='flex items-center gap-x-2 text-sm'>
@@ -526,8 +542,7 @@ const Home = () => {
 						</div>
 					</div>
 					<div
-						className='flex justify-center
-         w-full items-center  my-[10px]'>
+						className='flex justify-center w-full items-center  my-[10px]'>
 						<Link
 							to={"/leaderboard"}
 							className='bg-[linear-gradient(90deg,#112946_0%,#2823A9_50%,#2100EC_100%)] flex gap-2 items-center px-4 py-2  rounded-full'>
@@ -579,8 +594,8 @@ const Home = () => {
 										{doubleBoostStart
 											? tapValue?.value * 2
 											: powerBoostStart
-											? tapValue?.value * 5
-											: tapValue?.value}
+												? tapValue?.value * 5
+												: tapValue?.value}
 									</SlideUpText>
 								))}
 							</Container>

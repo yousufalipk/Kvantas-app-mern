@@ -59,7 +59,7 @@ root.render(
 	<React.StrictMode>
 		<TonConnectUIProvider manifestUrl='https://kvants.vercel.app/manifest.json'>
 			<Loader>
-				<RouterProvider router={router}></RouterProvider>
+				<RouterProvider router={router} ></RouterProvider>
 			</Loader>
 		</TonConnectUIProvider>
 	</React.StrictMode>

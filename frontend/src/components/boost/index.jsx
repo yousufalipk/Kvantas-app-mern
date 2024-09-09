@@ -1,7 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useNavigation } from "react-router-dom";
-import { doc, getDoc, serverTimestamp, updateDoc } from "firebase/firestore";
-import { db } from "../../config/firebase";
 import { useUser } from "../../context";
 
 import BoosterCard from "./boosterCard";
@@ -203,6 +201,7 @@ const Boost = () => {
 		doubleBoostStart,
 		powerBoostStart,
 	} = useUser();
+	const apiUrl = process.env.REACT_APP_API_URL;
 	const [openInfo, setOpenInfo] = useState(false);
 	const [openInfoTwo, setOpenInfoTwo] = useState(false);
 	const [isUpgradeModalVisible, setIsUpgradeModalVisible] = useState(false);
@@ -253,87 +252,108 @@ const Boost = () => {
 			return (num / 1000000).toFixed(3).replace(".", ".") + " M";
 		}
 	};
+
+	// 1 - function to update 
 	const handleUpgrade = async () => {
 		setIsUpgrading(true);
 		setLoading(true);
 
-		const nextLevel = tapValue.level;
-		const upgradeCost = upgradeCosts[nextLevel];
-		if (
-			nextLevel < tapValues.length &&
-			balance + refBonus >= upgradeCost &&
-			id
-		) {
-			const newTapValue = tapValues[nextLevel];
-			const userRef = doc(db, "telegramUsers", id.toString());
+		try {
+			const response = await fetch(`${apiUrl}/upgrade`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					userId: id.toString(),
+					balance,
+					tapValue,
+					refBonus,
+				}),
+			});
 
-			try {
-				await updateDoc(userRef, {
-					tapValue: newTapValue,
-					balance: balance - upgradeCost,
-				});
-				setTapValue(newTapValue);
-				setBalance((prevBalance) => prevBalance - upgradeCost);
+			const data = await response.json();
 
+			if (response.ok) {
+				setTapValue(data.newTapValue);
+				setBalance(data.newBalance);
 				setIsUpgrading(false);
-				sendUserData();
 
 				setTimeout(() => {
 					setTaping(false);
 					setLoading(false);
-					notify(` Upgrade is yours! Multitap Level ${newTapValue?.level}`);
+					notify(data.message);
 				}, 1500);
-			} catch (error) {
-				console.error("Error updating tap value:", error);
+
+				sendUserData();
+			} else {
+				setTimeout(() => {
+					notifyError(data.message);
+					setIsUpgrading(false);
+					setLoading(false);
+				}, 2000);
 			}
+		} catch (error) {
+			console.error("Error during upgrade:", error);
+			setTimeout(() => {
+				notifyError("An error occurred during the upgrade process.");
+				setIsUpgrading(false);
+				setLoading(false);
+			}, 2000);
 		}
 	};
 
+	// 2 - function to update 
 	const handleEnergyUpgrade = async () => {
 		setIsUpgradingEn(true);
-
 		setLoading(true);
 
-		const nextEnergyLevel = battery.level;
-		const energyUpgradeCost = energyUpgradeCosts[nextEnergyLevel];
-		if (
-			nextEnergyLevel < energyValues.length &&
-			balance + refBonus >= energyUpgradeCost &&
-			id
-		) {
-			const newEnergyValue = energyValues[nextEnergyLevel];
-			const userRef = doc(db, "telegramUsers", id.toString());
-			// const userRef = doc(db, "telegramUsers", "7326264229");
+		try {
+			const response = await fetch(`${apiUrl}/energy-upgrade`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					userId: id.toString(),
+					balance,
+					battery,
+					refBonus,
+				}),
+			});
 
-			try {
-				await updateDoc(userRef, {
-					battery: {
-						level: newEnergyValue.level,
-						energy: newEnergyValue.energy + 500,
-					},
-					balance: balance - energyUpgradeCost,
-					energy: newEnergyValue.energy + 500,
-				});
-				setBattery(newEnergyValue);
-				localStorage.setItem("energy", newEnergyValue.energy + 500);
-				setEnergy(newEnergyValue.energy + 500);
-				setRefiller(newEnergyValue.energy + 500);
+			const data = await response.json();
 
-				setBalance((prevBalance) => prevBalance - energyUpgradeCost);
+			if (response.ok) {
+				setBattery(data.newEnergyValue);
+				localStorage.setItem("energy", data.newEnergyValue.energy + 500);
+				setEnergy(data.newEnergyValue.energy + 500);
+				setRefiller(data.newEnergyValue.energy + 500);
+				setBalance(data.newBalance);
 				setIsUpgradingEn(false);
 				setCongrats(true);
-				sendUserData();
+
 				setTimeout(() => {
 					setEnergyLimit(false);
 					setLoading(false);
-					notify(
-						`Upgrade is yours! Energy limit Level ${newEnergyValue?.level}`
-					);
+					notify(data.message);
 				}, 1500);
-			} catch (error) {
-				notifyError(<p>{`Error updating energy value : ${error}`}</p>);
-				console.error("Error updating energy value:", error);
+
+				sendUserData();
+			} else {
+				setTimeout(() => {
+					notifyError(data.message);
+					setIsUpgradingEn(false);
+					setLoading(false);
+				}, 2000);
 			}
+		} catch (error) {
+			console.error("Error during energy upgrade:", error);
+			setTimeout(() => {
+				notifyError("An error occurred during the energy upgrade process.");
+				setIsUpgradingEn(false);
+				setLoading(false);
+			}, 2000);
 		}
 	};
 
@@ -372,62 +392,56 @@ const Boost = () => {
 	}, []);
 	const navigation = useNavigation();
 
+
+	// 3 - function to update 
 	const fetchStartTime = async () => {
-		const userRef = doc(db, "telegramUsers", id.toString());
-		const userDoc = await getDoc(userRef);
+		try {
+			const response = await fetch(`${apiUrl}/fetch-start-time`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ userId: id.toString() }),
+			});
 
-		if (userDoc.exists()) {
-			const data = userDoc.data();
-			const startTime = data?.double_booster?.startAt
-				? data.double_booster.startAt.toDate()
-				: "";
+			const data = await response.json();
 
-			if (startTime) {
-				const currentTime = Date.now();
-				const timePassed = currentTime - startTime;
-				const oneHourInMillis = 24 * 60 * 60 * 1000;
-
-				if (timePassed >= oneHourInMillis) {
-					await updateDoc(userRef, {
-						double_booster: {
-							startAt: "",
-							rewardTimer: "",
-							rewardStart: false,
-							rewardClaimed: 0,
-						},
-					});
-					setCurrentReward(0);
+			if (response.ok) {
+				if (data.message === 'Double booster expired and reset successfully.') {
+					setCurrentReward(data.currentReward);
 				}
+				// Handle other cases as needed
+			} else {
+				console.error('Error:', data.message);
 			}
+		} catch (error) {
+			console.error('Error during fetching start time:', error);
 		}
 	};
+
+	// 4 - function to update 
 	const fetchStartTimePowerTap = async () => {
-		const userRef = doc(db, "telegramUsers", id.toString());
-		const userDoc = await getDoc(userRef);
+		try {
+			const response = await fetch(`${apiUrl}/fetch-start-time-power-tap`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ userId: id.toString() }),
+			});
 
-		if (userDoc.exists()) {
-			const data = userDoc.data();
-			const startTime = data?.power_tap?.startAt
-				? data.power_tap.startAt.toDate()
-				: "";
+			const data = await response.json();
 
-			if (startTime) {
-				const currentTime = Date.now();
-				const timePassed = currentTime - startTime;
-				const oneHourInMillis = 24 * 60 * 60 * 1000;
-
-				if (timePassed >= oneHourInMillis) {
-					await updateDoc(userRef, {
-						power_tap: {
-							startAt: "",
-							rewardTimer: "",
-							rewardStart: false,
-							rewardClaimed: "",
-						},
-					});
-					setPowerIndex(0);
+			if (response.ok) {
+				if (data.message === 'Power tap expired and reset successfully.') {
+					setPowerIndex(data.newPowerIndex);
 				}
+				// Handle other cases as needed
+			} else {
+				console.error('Error:', data.message);
 			}
+		} catch (error) {
+			console.error('Error during fetching power tap start time:', error);
 		}
 	};
 
@@ -449,110 +463,92 @@ const Boost = () => {
 		return now - lastClaimedDate >= 1 * 60 * 1000;
 	};
 
+
+	// 5 - function to update 
 	const handlePowerTap = async () => {
-		console.log(doubleBoostStart);
+		if (doubleBoostStart) {
+			notifyError(`One booster already enabled`);
+			return;
+		}
 
-		if (!doubleBoostStart) {
-			setLoadingPower(true);
-			try {
-				const userRef = doc(db, "telegramUsers", id.toString());
-				const userDoc = await getDoc(userRef);
-				const { power_tap } = userDoc.data();
+		setLoadingPower(true);
 
-				if (power_tap.rewardClaimed >= 3) {
-					notifyError(`Come after 24 hours`);
-					setLoadingPower(false);
-					return;
-				}
+		try {
+			const response = await fetch(`${apiUrl}/handle-power-tap`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ userId: id.toString() }),
+			});
 
-				const rewardTimerExpired =
-					power_tap.rewardTimer && check1hour(power_tap.rewardTimer);
-				const startAt = power_tap.startAt || serverTimestamp();
-				const rewardClaimed = power_tap.rewardClaimed + 1;
+			const data = await response.json();
 
-				if (rewardTimerExpired || !power_tap.rewardTimer) {
-					await updateDoc(userRef, {
-						power_tap: {
-							rewardStart: true,
-							startAt: startAt,
-							rewardTimer: serverTimestamp(),
-							rewardClaimed: rewardClaimed,
-						},
-					});
-
+			if (response.ok) {
+				if (data.message === 'You can tap unlimited times for 1 minute') {
 					setPowerBootStart(true);
-					setPowerIndex(rewardClaimed);
+					setPowerIndex(data.newPowerIndex);
 					fetchStartTimePowerTap(id);
-					notify(`You can tap unlimited time for 1 minute`);
+					notify(data.message);
 					setTimeout(() => {
 						setPowerTap(false);
 					}, 1000);
 				} else {
-					notifyError(`PowerTap already enable`);
+					notifyError(data.message);
 				}
-			} catch (error) {
-				console.error("Error updating document: ", error);
-			} finally {
-				setTimeout(() => {
-					setLoadingPower(false);
-				}, 1000);
+			} else {
+				console.error('Error:', data.message);
 			}
-		} else {
-			notifyError(`One booster already enable`);
+		} catch (error) {
+			console.error('Error during power tap handling:', error);
+		} finally {
+			setTimeout(() => {
+				setLoadingPower(false);
+			}, 1000);
 		}
 	};
+
+	// 6 - function to update 
 	const handleSetIndexClick = async () => {
-		console.log(powerBoostStart);
+		if (powerBoostStart) {
+			notifyError('One booster already enabled');
+			return;
+		}
 
-		if (!powerBoostStart) {
-			setLoading(true);
-			try {
-				const userRef = doc(db, "telegramUsers", id.toString());
-				const userDoc = await getDoc(userRef);
-				const { double_booster } = userDoc.data();
+		setLoading(true);
 
-				if (double_booster.rewardClaimed >= 3) {
-					notifyError(`Come after 24 hours`);
-					setLoading(false);
-					return;
-				}
+		try {
+			const response = await fetch(`${apiUrl}/handle-set-index`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ userId: id.toString() }),
+			});
 
-				const rewardTimerExpired =
-					double_booster.rewardTimer && check1hour(double_booster.rewardTimer);
-				const startAt = double_booster.startAt || serverTimestamp();
-				const rewardClaimed = double_booster.rewardClaimed + 1;
+			const data = await response.json();
 
-				if (rewardTimerExpired || !double_booster.rewardTimer) {
-					let data = await updateDoc(userRef, {
-						double_booster: {
-							rewardStart: true,
-							startAt: startAt,
-							rewardTimer: serverTimestamp(),
-							rewardClaimed: rewardClaimed,
-						},
-					});
-
-					console.log(data, "run");
-
+			if (response.ok) {
+				if (data.message === 'You can tap unlimited times for 1 minute') {
 					setDoubleBosst(true);
-					setCurrentReward(rewardClaimed);
+					setCurrentReward(data.newRewardClaimed);
 					fetchStartTimeTap(id);
-					notify(`You can tap unlimited time for 1 minute`);
+					notify(data.message);
 					setTimeout(() => {
 						setDoubleBooster(false);
 					}, 1000);
 				} else {
-					notifyError(`Booster already enable`);
+					notifyError(data.message);
 				}
-			} catch (error) {
-				console.error("Error updating document: ", error);
-			} finally {
-				setTimeout(() => {
-					setLoading(false);
-				}, 1000);
+			} else {
+				console.error('Error:', data.message);
 			}
-		} else {
-			notifyError(`One booster already enable`);
+		} catch (error) {
+			console.error('Error during handle set index click:', error);
+		} finally {
+			setTimeout(() => {
+				setLoading(false);
+			}, 1000);
 		}
 	};
 
@@ -630,9 +626,8 @@ const Boost = () => {
 				</div>
 			</div>
 			<div
-				className={`${
-					powerTap ? "visible" : "invisible"
-				} h-[100vh] absolute bottom-0 left-0 right-0 bg-[#000000B2]`}>
+				className={`${powerTap ? "visible" : "invisible"
+					} h-[100vh] absolute bottom-0 left-0 right-0 bg-[#000000B2]`}>
 				<div
 					className={` fixed bottom-0 left-0 right-0 h-fit modal_background  z-50 backdrop-blur-sm  border-t-[3px] border-[#A51CF5] rounded-tl-[20px] rounded-tr-[20px] flex justify-center container-1 pb-[12px] pt-[51px] text-white bg-[#0A031880]`}>
 					<div className='w-full flex flex-col justify-between'>
@@ -711,16 +706,15 @@ const Boost = () => {
 							{isLoadingPower
 								? "Boosting..."
 								: hasSufficientBalanceEn
-								? "Boost Now!"
-								: "Insufficient Balance"}
+									? "Boost Now!"
+									: "Insufficient Balance"}
 						</button>
 					</div>
 				</div>
 			</div>
 			<div
-				className={`${
-					doubleBooster ? "visible" : "invisible"
-				} h-[100vh] absolute bottom-0 left-0 right-0 bg-[#000000B2]`}>
+				className={`${doubleBooster ? "visible" : "invisible"
+					} h-[100vh] absolute bottom-0 left-0 right-0 bg-[#000000B2]`}>
 				<div
 					className={` fixed bottom-0 left-0 right-0 h-fit modal_background  z-50 backdrop-blur-sm  border-t-[3px] border-[#A51CF5] rounded-tl-[20px] rounded-tr-[20px] flex justify-center container-1 pb-[12px] pt-[51px] text-white bg-[#0A031880]`}>
 					<div className='w-full flex flex-col justify-between'>
@@ -799,16 +793,15 @@ const Boost = () => {
 							{isLoading
 								? "Boosting..."
 								: hasSufficientBalanceEn
-								? "Boost Now!"
-								: "Insufficient Balance"}
+									? "Boost Now!"
+									: "Insufficient Balance"}
 						</button>
 					</div>
 				</div>
 			</div>
 			<div
-				className={`${
-					energyLimit ? "visible" : "invisible"
-				} h-[100vh] absolute bottom-0 left-0 right-0 bg-[#000000B2]`}>
+				className={`${energyLimit ? "visible" : "invisible"
+					} h-[100vh] absolute bottom-0 left-0 right-0 bg-[#000000B2]`}>
 				<div
 					className={` fixed bottom-0 left-0 right-0 h-fit modal_background  z-50 backdrop-blur-sm  border-t-[3px] border-[#A51CF5]  rounded-tl-[20px] rounded-tr-[20px] flex justify-center container-1 pb-[12px] pt-[51px] bg-[#0A031880]`}>
 					<div className='w-full flex flex-col justify-between'>
@@ -904,18 +897,17 @@ const Boost = () => {
 							{!nextEnergyUpgradeCost
 								? "Max Level Reached"
 								: isLoading
-								? "Boosting..."
-								: hasSufficientBalanceEn
-								? "Get it!"
-								: "Insufficient Balance"}
+									? "Boosting..."
+									: hasSufficientBalanceEn
+										? "Get it!"
+										: "Insufficient Balance"}
 						</button>
 					</div>
 				</div>
 			</div>
 			<div
-				className={`${
-					isTaping ? "visible" : "invisible"
-				} h-[100vh] absolute bottom-0 left-0 right-0 bg-[#000000B2]`}>
+				className={`${isTaping ? "visible" : "invisible"
+					} h-[100vh] absolute bottom-0 left-0 right-0 bg-[#000000B2]`}>
 				<div
 					className={` fixed bottom-0 left-0 right-0 h-fit modal_background  z-50 backdrop-blur-sm  border-t-[3px] border-[#A51CF5]  rounded-tl-[20px] rounded-tr-[20px] flex justify-center container-1 pb-[12px] pt-[51px] bg-[#0A031880]`}>
 					<div className='w-full flex flex-col justify-between'>
@@ -1009,10 +1001,10 @@ const Boost = () => {
 							{!nextUpgradeCost
 								? "Max Level Reached"
 								: isLoading
-								? "Boosting..."
-								: hasSufficientBalance
-								? "Get it!"
-								: "Insufficient Balance"}
+									? "Boosting..."
+									: hasSufficientBalance
+										? "Get it!"
+										: "Insufficient Balance"}
 						</button>
 					</div>
 				</div>
