@@ -128,7 +128,6 @@ const energyValues = [
     },
 ];
 
-
 exports.getAllSocialTasks = async (req, res) => {
     try {
         const socialTasks = await SocialModel.find({});
